@@ -3,6 +3,7 @@ import re
 import html
 import smtplib
 import ssl
+import numpy as np
 import threading
 import time as time_module
 from datetime import date, time, datetime, timedelta
@@ -23,6 +24,18 @@ from send_today_report import mark_sent_today, is_already_sent_today
 ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 load_dotenv(ENV_FILE, override=True)
 
+def get_config(key: str, default: str = "") -> str:
+    """Retrieves configuration from os.environ, .env, or Streamlit Cloud st.secrets."""
+    val = os.getenv(key)
+    if val is not None and str(val).strip():
+        return str(val)
+    try:
+        if hasattr(st, "secrets") and key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return default
+
 st.set_page_config(
     page_title="Daily Report Automation",
     page_icon="📝",
@@ -32,285 +45,210 @@ st.set_page_config(
 
 # Universal & Dynamic Theme CSS for BOTH Dark Mode & Light Mode
 if "theme_radio" in st.session_state:
-    st.session_state["theme_mode"] = "Dark" if "Dark" in st.session_state["theme_radio"] else "Light"
+    st.session_state["theme_mode"] = "Light" if "Light" in st.session_state["theme_radio"] else "Dark"
 elif "theme_mode" not in st.session_state:
-    st.session_state["theme_mode"] = os.getenv("APP_THEME", "Dark")
+    st.session_state["theme_mode"] = get_config("APP_THEME", "Light")
 
-current_theme = st.session_state.get("theme_mode", "Dark")
+current_theme = st.session_state.get("theme_mode", "Light")
 
-def get_theme_css(theme: str) -> str:
-    if theme == "Light":
-        return """
-        <style>
-        /* ========================================================
-           ☀️ LIGHT THEME STYLES
-           ======================================================== */
-        :root {
-            --text-color: #0f172a;
-            --background-color: #f8fafc;
-            --secondary-background-color: #ffffff;
-        }
+if current_theme == "Light":
+    theme_vars = """
+    :root {
+        --text-color: #0f172a !important;
+        --background-color: #f8fafc !important;
+        --secondary-background-color: #ffffff !important;
+    }
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+    }
+    [data-testid="stSidebar"], [data-testid="stSidebar"] > div:first-child {
+        background-color: #ffffff !important;
+        border-right: 1px solid #e2e8f0 !important;
+    }
+    [data-testid="stSidebar"] * {
+        color: #1e293b !important;
+    }
+    h1, h2, h3, h4, h5, h6,
+    [data-testid="stWidgetLabel"] label, 
+    [data-testid="stWidgetLabel"] p, 
+    label[data-testid="stWidgetLabel"],
+    .stWidgetLabel p,
+    .stWidgetLabel {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+    }
+    .stMarkdown p, .stMarkdown div, .stMarkdown span {
+        color: #1e293b;
+    }
+    [data-testid="stTextInput"] input, 
+    [data-testid="stTextArea"] textarea, 
+    [data-testid="stDateInput"] input, 
+    [data-testid="stTimeInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    .stTextInput input:disabled, 
+    input:disabled, 
+    [data-testid="stTextInput"] input[disabled] {
+        background-color: #f1f5f9 !important;
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
+        opacity: 0.95 !important;
+        font-weight: 600 !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    [data-testid="stCaptionContainer"] p,
+    [data-testid="stCaptionContainer"] {
+        color: #475569 !important;
+    }
+    [data-testid="stCaptionContainer"] code,
+    .stMarkdown code,
+    code {
+        color: #15803d !important;
+        background-color: #f1f5f9 !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    [data-testid="stCheckbox"] label, 
+    [data-testid="stCheckbox"] label span, 
+    [data-testid="stCheckbox"] p,
+    [data-testid="stRadio"] label,
+    [data-testid="stRadio"] label p,
+    [data-testid="stRadio"] div[role="radiogroup"] label {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stExpander"] {
+        background-color: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    [data-testid="stExpander"] details summary span,
+    [data-testid="stExpander"] details summary svg {
+        color: #0f172a !important;
+        fill: #0f172a !important;
+    }
+    hr, [data-testid="stDivider"] {
+        border-color: #e2e8f0 !important;
+    }
+    [data-testid="stButton"] button {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    [data-testid="stButton"] button:hover {
+        background-color: #f1f5f9 !important;
+        color: #0f172a !important;
+        border-color: #94a3b8 !important;
+    }
+    """
+else:
+    theme_vars = """
+    :root {
+        --text-color: #f8fafc !important;
+        --background-color: #0e1117 !important;
+        --secondary-background-color: #1e293b !important;
+    }
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #0e1117 !important;
+        color: #f8fafc !important;
+    }
+    [data-testid="stSidebar"], [data-testid="stSidebar"] > div:first-child {
+        background-color: #161b22 !important;
+        border-right: 1px solid #30363d !important;
+    }
+    [data-testid="stSidebar"] * {
+        color: #e6edf3 !important;
+    }
+    h1, h2, h3, h4, h5, h6,
+    [data-testid="stWidgetLabel"] label, 
+    [data-testid="stWidgetLabel"] p, 
+    label[data-testid="stWidgetLabel"],
+    .stWidgetLabel p,
+    .stWidgetLabel {
+        color: #f8fafc !important;
+        font-weight: 600 !important;
+    }
+    .stMarkdown p, .stMarkdown div, .stMarkdown span {
+        color: #e2e8f0;
+    }
+    [data-testid="stTextInput"] input, 
+    [data-testid="stTextArea"] textarea, 
+    [data-testid="stDateInput"] input, 
+    [data-testid="stTimeInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] {
+        background-color: #1e293b !important;
+        color: #f8fafc !important;
+        -webkit-text-fill-color: #f8fafc !important;
+        border: 1px solid #334155 !important;
+    }
+    .stTextInput input:disabled, 
+    input:disabled, 
+    [data-testid="stTextInput"] input[disabled] {
+        background-color: #1e293b !important;
+        color: #f8fafc !important;
+        -webkit-text-fill-color: #f8fafc !important;
+        opacity: 0.95 !important;
+        font-weight: 600 !important;
+        border: 1px solid #475569 !important;
+    }
+    [data-testid="stCaptionContainer"] p,
+    [data-testid="stCaptionContainer"] {
+        color: #94a3b8 !important;
+    }
+    [data-testid="stCaptionContainer"] code,
+    .stMarkdown code,
+    code {
+        color: #4ade80 !important;
+        background-color: #1e293b !important;
+        border: 1px solid #334155 !important;
+    }
+    [data-testid="stCheckbox"] label, 
+    [data-testid="stCheckbox"] label span, 
+    [data-testid="stCheckbox"] p,
+    [data-testid="stRadio"] label,
+    [data-testid="stRadio"] label p,
+    [data-testid="stRadio"] div[role="radiogroup"] label {
+        color: #f8fafc !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stExpander"] {
+        background-color: #161b22 !important;
+        border: 1px solid #30363d !important;
+    }
+    [data-testid="stExpander"] details summary span,
+    [data-testid="stExpander"] details summary svg {
+        color: #f8fafc !important;
+        fill: #f8fafc !important;
+    }
+    hr, [data-testid="stDivider"] {
+        border-color: #30363d !important;
+    }
+    [data-testid="stButton"] button {
+        background-color: #1e293b !important;
+        color: #f8fafc !important;
+        border: 1px solid #334155 !important;
+    }
+    [data-testid="stButton"] button:hover {
+        background-color: #334155 !important;
+        color: #ffffff !important;
+        border-color: #475569 !important;
+    }
+    """
 
-        /* App Background & Base Container */
-        .stApp, 
-        [data-testid="stAppViewContainer"], 
-        [data-testid="stHeader"] {
-            background-color: #f8fafc !important;
-            color: #0f172a !important;
-        }
+st.markdown(f"<style>{theme_vars}</style>", unsafe_allow_html=True)
 
-        /* Sidebar */
-        [data-testid="stSidebar"],
-        [data-testid="stSidebar"] > div:first-child {
-            background-color: #ffffff !important;
-            border-right: 1px solid #e2e8f0 !important;
-        }
-        [data-testid="stSidebar"] * {
-            color: #1e293b !important;
-        }
-
-        /* Headings & Widget Labels */
-        h1, h2, h3, h4, h5, h6,
-        [data-testid="stWidgetLabel"] label, 
-        [data-testid="stWidgetLabel"] p, 
-        label[data-testid="stWidgetLabel"],
-        .stWidgetLabel p,
-        .stWidgetLabel {
-            color: #0f172a !important;
-            font-weight: 600 !important;
-        }
-
-        /* Paragraphs & Markdown */
-        .stMarkdown p, .stMarkdown div, .stMarkdown span {
-            color: #1e293b;
-        }
-
-        /* Text Inputs, Textareas, Date/Time Inputs */
-        [data-testid="stTextInput"] input, 
-        [data-testid="stTextArea"] textarea, 
-        [data-testid="stDateInput"] input, 
-        [data-testid="stTimeInput"] input,
-        [data-testid="stNumberInput"] input,
-        [data-testid="stSelectbox"] div[data-baseweb="select"] {
-            background-color: #ffffff !important;
-            color: #0f172a !important;
-            -webkit-text-fill-color: #0f172a !important;
-            border: 1px solid #cbd5e1 !important;
-        }
-
-        /* Disabled Input (e.g. Day: Saturday) */
-        .stTextInput input:disabled, 
-        input:disabled, 
-        [data-testid="stTextInput"] input[disabled] {
-            background-color: #f1f5f9 !important;
-            color: #0f172a !important;
-            -webkit-text-fill-color: #0f172a !important;
-            opacity: 0.95 !important;
-            font-weight: 600 !important;
-            border: 1px solid #cbd5e1 !important;
-        }
-
-        /* Captions & Code Pills */
-        [data-testid="stCaptionContainer"] p,
-        [data-testid="stCaptionContainer"] {
-            color: #475569 !important;
-            font-size: 0.85rem !important;
-        }
-
-        [data-testid="stCaptionContainer"] code,
-        .stMarkdown code,
-        code {
-            color: #15803d !important;
-            background-color: #f1f5f9 !important;
-            border: 1px solid #cbd5e1 !important;
-            font-weight: 700 !important;
-            padding: 2px 7px !important;
-            border-radius: 4px !important;
-        }
-
-        /* Checkboxes & Radios */
-        [data-testid="stCheckbox"] label, 
-        [data-testid="stCheckbox"] label span, 
-        [data-testid="stCheckbox"] p,
-        [data-testid="stRadio"] label,
-        [data-testid="stRadio"] label p,
-        [data-testid="stRadio"] div[role="radiogroup"] label {
-            color: #0f172a !important;
-            font-weight: 600 !important;
-        }
-
-        /* Secondary Buttons */
-        [data-testid="stButton"] button {
-            background-color: #ffffff !important;
-            color: #0f172a !important;
-            border: 1px solid #cbd5e1 !important;
-        }
-        [data-testid="stButton"] button:hover {
-            background-color: #f1f5f9 !important;
-            color: #0f172a !important;
-            border-color: #94a3b8 !important;
-        }
-
-        /* Expanders */
-        [data-testid="stExpander"] {
-            background-color: #ffffff !important;
-            border: 1px solid #e2e8f0 !important;
-            border-radius: 8px !important;
-        }
-        [data-testid="stExpander"] details summary span,
-        [data-testid="stExpander"] details summary svg {
-            color: #0f172a !important;
-            fill: #0f172a !important;
-            font-weight: 600 !important;
-        }
-
-        /* Dividers */
-        hr, [data-testid="stDivider"] {
-            border-color: #e2e8f0 !important;
-        }
-        </style>
-        """
-    else:
-        return """
-        <style>
-        /* ========================================================
-           🌙 DARK THEME STYLES
-           ======================================================== */
-        :root {
-            --text-color: #f8fafc;
-            --background-color: #0e1117;
-            --secondary-background-color: #1e293b;
-        }
-
-        /* App Background & Base Container */
-        .stApp, 
-        [data-testid="stAppViewContainer"], 
-        [data-testid="stHeader"] {
-            background-color: #0e1117 !important;
-            color: #f8fafc !important;
-        }
-
-        /* Sidebar */
-        [data-testid="stSidebar"],
-        [data-testid="stSidebar"] > div:first-child {
-            background-color: #161b22 !important;
-            border-right: 1px solid #30363d !important;
-        }
-        [data-testid="stSidebar"] * {
-            color: #e6edf3 !important;
-        }
-
-        /* Headings & Widget Labels */
-        h1, h2, h3, h4, h5, h6,
-        [data-testid="stWidgetLabel"] label, 
-        [data-testid="stWidgetLabel"] p, 
-        label[data-testid="stWidgetLabel"],
-        .stWidgetLabel p,
-        .stWidgetLabel {
-            color: #f8fafc !important;
-            font-weight: 600 !important;
-        }
-
-        /* Paragraphs & Markdown */
-        .stMarkdown p, .stMarkdown div, .stMarkdown span {
-            color: #e2e8f0;
-        }
-
-        /* Text Inputs, Textareas, Date/Time Inputs */
-        [data-testid="stTextInput"] input, 
-        [data-testid="stTextArea"] textarea, 
-        [data-testid="stDateInput"] input, 
-        [data-testid="stTimeInput"] input,
-        [data-testid="stNumberInput"] input,
-        [data-testid="stSelectbox"] div[data-baseweb="select"] {
-            background-color: #1e293b !important;
-            color: #f8fafc !important;
-            -webkit-text-fill-color: #f8fafc !important;
-            border: 1px solid #334155 !important;
-        }
-
-        /* Disabled Input (e.g. Day: Saturday) */
-        .stTextInput input:disabled, 
-        input:disabled, 
-        [data-testid="stTextInput"] input[disabled] {
-            background-color: #1e293b !important;
-            color: #f8fafc !important;
-            -webkit-text-fill-color: #f8fafc !important;
-            opacity: 0.95 !important;
-            font-weight: 600 !important;
-            border: 1px solid #475569 !important;
-        }
-
-        /* Captions & Code Pills */
-        [data-testid="stCaptionContainer"] p,
-        [data-testid="stCaptionContainer"] {
-            color: #94a3b8 !important;
-            font-size: 0.85rem !important;
-        }
-
-        [data-testid="stCaptionContainer"] code,
-        .stMarkdown code,
-        code {
-            color: #4ade80 !important;
-            background-color: #1e293b !important;
-            border: 1px solid #334155 !important;
-            font-weight: 700 !important;
-            padding: 2px 7px !important;
-            border-radius: 4px !important;
-        }
-
-        /* Checkboxes & Radios */
-        [data-testid="stCheckbox"] label, 
-        [data-testid="stCheckbox"] label span, 
-        [data-testid="stCheckbox"] p,
-        [data-testid="stRadio"] label,
-        [data-testid="stRadio"] label p,
-        [data-testid="stRadio"] div[role="radiogroup"] label {
-            color: #f8fafc !important;
-            font-weight: 600 !important;
-        }
-
-        /* Secondary Buttons */
-        [data-testid="stButton"] button {
-            background-color: #1e293b !important;
-            color: #f8fafc !important;
-            border: 1px solid #334155 !important;
-        }
-        [data-testid="stButton"] button:hover {
-            background-color: #334155 !important;
-            color: #ffffff !important;
-            border-color: #475569 !important;
-        }
-
-        /* Expanders */
-        [data-testid="stExpander"] {
-            background-color: #161b22 !important;
-            border: 1px solid #30363d !important;
-            border-radius: 8px !important;
-        }
-        [data-testid="stExpander"] details summary span,
-        [data-testid="stExpander"] details summary svg {
-            color: #f8fafc !important;
-            fill: #f8fafc !important;
-            font-weight: 600 !important;
-        }
-
-        /* Dividers */
-        hr, [data-testid="stDivider"] {
-            border-color: #30363d !important;
-        }
-        </style>
-        """
-
-UNIVERSAL_CSS = """
+UNIVERSAL_RESPONSIVE_CSS = """
 <style>
-/* Hide Streamlit Deploy button from header */
-[data-testid="stDeployButton"], 
-.stDeployButton {
+/* Common Universal Styles */
+[data-testid="stDeployButton"], .stDeployButton {
     display: none !important;
 }
 
-/* Primary Action Button Styling */
 [data-testid="stBaseButton-primary"], button[kind="primary"] {
     background-color: #ff4b4b !important;
     color: #ffffff !important;
@@ -322,20 +260,24 @@ UNIVERSAL_CSS = """
     color: #ffffff !important;
 }
 
-/* ========================================================
-   ✉️ LIVE EMAIL PREVIEW CARD
-   Authentic pure white letterhead document with 100% crisp black table 
-   and vibrant Wine & Indigo RSS signature in BOTH themes.
-   ======================================================== */
+/* Live Email Preview Card (Always pure white document with crisp black table) */
 .email-preview-card,
 div[data-testid="stExpander"] div.stHtml,
 div[data-testid="stExpander"] div[data-testid="stHtml"] {
     background-color: #ffffff !important;
     color: #000000 !important;
     border-radius: 8px !important;
-    padding: 24px 28px !important;
+    padding: 24px 28px;
     border: 1px solid #cbd5e1 !important;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.email-table-scroll-wrapper {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
 }
 
 .email-preview-card p,
@@ -387,11 +329,106 @@ div[data-testid="stExpander"] div.stHtml .rss-indigo,
     font-weight: bold !important;
     font-family: Georgia, 'Times New Roman', serif !important;
 }
+
+/* ========================================================
+   📱 MOBILE RESPONSIVE OPTIMIZATIONS (< 768px and < 640px)
+   ======================================================== */
+@media (max-width: 768px) {
+    /* 1. Eliminate heavy desktop padding on phones & tablets */
+    .block-container,
+    [data-testid="stMainBlockContainer"],
+    [data-testid="stAppViewBlockContainer"] {
+        padding-left: 0.85rem !important;
+        padding-right: 0.85rem !important;
+        padding-top: 1.2rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 100% !important;
+    }
+
+    /* 2. Responsive Headings */
+    h1 {
+        font-size: 1.6rem !important;
+        line-height: 1.25 !important;
+    }
+    h2 { font-size: 1.35rem !important; }
+    h3 { font-size: 1.2rem !important; }
+    h4 { font-size: 1.05rem !important; }
+
+    /* 3. Mobile touch-friendly inputs (16px prevents iOS Safari auto-zoom) */
+    [data-testid="stTextInput"] input, 
+    [data-testid="stTextArea"] textarea, 
+    [data-testid="stDateInput"] input, 
+    [data-testid="stTimeInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] {
+        font-size: 16px !important;
+        min-height: 44px !important;
+    }
+
+    /* 4. Touch-friendly Buttons (min 46px height) */
+    [data-testid="stButton"] button,
+    [data-testid="stDownloadButton"] button,
+    [data-testid="stBaseButton-primary"] {
+        min-height: 46px !important;
+        font-size: 15px !important;
+        width: 100% !important;
+    }
+
+    /* 5. Mobile Sidebar adjustments */
+    [data-testid="stSidebar"] {
+        max-width: 88vw !important;
+    }
+
+    /* 6. Email Preview Card: Responsive padding & font */
+    .email-preview-card {
+        padding: 16px 14px !important;
+        border-radius: 6px !important;
+    }
+    .email-preview-card table {
+        font-size: 12.5px !important;
+        min-width: 290px !important;
+    }
+    .email-preview-card td {
+        padding: 7px 8px !important;
+    }
+    .email-preview-card .rss-indent {
+        padding-left: 18px !important;
+    }
+
+    /* 7. Responsive Tables & DataFrames */
+    [data-testid="stDataFrame"], 
+    [data-testid="stTable"] {
+        width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+}
+
+@media (max-width: 640px) {
+    /* 8. Stack form columns on narrow phones for 100% full-width touch area */
+    [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+    }
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+
+    /* 9. Hide desktop alignment spacer so checkbox is not pushed down */
+    .mobile-hide-spacer {
+        display: none !important;
+    }
+
+    /* 10. Radio theme switcher full-width on mobile */
+    [data-testid="stRadio"] div[role="radiogroup"] {
+        justify-content: flex-start !important;
+    }
+}
 </style>
 """
-
-st.markdown(get_theme_css(current_theme), unsafe_allow_html=True)
-st.markdown(UNIVERSAL_CSS, unsafe_allow_html=True)
+st.markdown(UNIVERSAL_RESPONSIVE_CSS, unsafe_allow_html=True)
 
 EXCEL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "daily_report.xlsx")
 HEADERS = ["Date", "Days", "In Time", "Out Time", "Service", "Task📝 ", "Dulingo (day,XP,english Score"]
@@ -606,39 +643,39 @@ def background_timer_send(delay_seconds: float, email_kwargs: dict, report_date_
 # ==========================================
 with st.sidebar:
     st.header("⚙️ Email & Mentor Setup")
-    st.caption(f"🎨 Active Theme: **{current_theme} Mode**")
+    st.caption("🌓 **Theme:** Toggle between **Light**, **Dark**, or **System** anytime in the top-right **⋮** menu.")
     
     cfg_sender_name = st.text_input(
         "Sender Display Name",
-        value=os.getenv("SENDER_NAME", "Surya Prakash R")
+        value=get_config("SENDER_NAME", "Surya Prakash R")
     )
     
     cfg_sender_email = st.text_input(
         "Sender Gmail",
-        value=os.getenv("SENDER_EMAIL", "rsuryaprakashb@gmail.com")
+        value=get_config("SENDER_EMAIL", "rsuryaprakashb@gmail.com")
     )
     
     cfg_sender_password = st.text_input(
         "Gmail App Password",
-        value=os.getenv("SENDER_PASSWORD", ""),
+        value=get_config("SENDER_PASSWORD", ""),
         type="password",
         help="16-character Google App Password (spaces will be automatically handled)."
     )
     
     cfg_recipients = st.text_area(
         "Mentor / Recipients (To)",
-        value=os.getenv("RECIPIENTS", "shashikumar.v@supplychainhub.com"),
+        value=get_config("RECIPIENTS", "shashikumar.v@supplychainhub.com"),
         height=70,
         help="Enter mentor and manager email addresses separated by commas."
     )
     
     cfg_cc = st.text_input(
         "CC (Optional)",
-        value=os.getenv("CC_RECIPIENTS", "venkateshwaran.s@supplychainhub.com, Ravikumar.s@supplychainhub.com")
+        value=get_config("CC_RECIPIENTS", "venkateshwaran.s@supplychainhub.com, Ravikumar.s@supplychainhub.com")
     )
     
-    cfg_smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    cfg_smtp_port = int(os.getenv("SMTP_PORT", 587))
+    cfg_smtp_server = get_config("SMTP_SERVER", "smtp.gmail.com")
+    cfg_smtp_port = int(get_config("SMTP_PORT", "587"))
     
     if st.button("💾 Save Settings to .env", use_container_width=True):
         update_env_variable("SENDER_NAME", cfg_sender_name.strip())
@@ -654,7 +691,7 @@ with st.sidebar:
     st.markdown("### ⏰ Daily Windows Task Scheduler")
     st.caption("Runs silently on Windows even when your browser or PC terminal is closed.")
     
-    env_sch_time_str = os.getenv("SCHEDULED_TIME", "19:00")
+    env_sch_time_str = get_config("SCHEDULED_TIME", "19:00")
     env_sch_time_obj = parse_time_str(env_sch_time_str, time(19, 0))
     
     sidebar_sch_time = st.time_input(
@@ -741,13 +778,13 @@ with header_col2:
     st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
     theme_choice = st.radio(
         "Theme",
-        options=["🌙 Dark", "☀️ Light"],
-        index=0 if current_theme == "Dark" else 1,
+        options=["☀️ Light", "🌙 Dark"],
+        index=0 if current_theme == "Light" else 1,
         horizontal=True,
         label_visibility="collapsed",
         key="theme_radio"
     )
-    chosen_theme = "Dark" if "Dark" in theme_choice else "Light"
+    chosen_theme = "Light" if "Light" in theme_choice else "Dark"
     if chosen_theme != st.session_state.get("theme_mode"):
         st.session_state["theme_mode"] = chosen_theme
         update_env_variable("APP_THEME", chosen_theme)
@@ -760,7 +797,7 @@ with col2:
     day_name = report_date.strftime("%A")
     st.text_input("Day", value=day_name, disabled=True)
 with col3:
-    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div class='mobile-hide-spacer' style='height: 28px;'></div>", unsafe_allow_html=True)
     is_absent = st.checkbox("🚫 Mark as ABSENT", value=False, help="Check this if you were absent/on leave. Only Date, Day, and Duolingo will be saved to Excel. No email will be sent.")
 
 if not is_absent:
@@ -880,13 +917,13 @@ else:
         st.caption("Customize the fields shown in the email table. Defaults match your official format.")
         m_col1, m_col2 = st.columns(2)
         with m_col1:
-            meta_applicant = st.text_input("Applicant", value=os.getenv("APPLICANT", "SURYA PRAKASH R"))
-            meta_rep_manager = st.text_input("Reporting Manager", value=os.getenv("REPORTING_MANAGER", "SHASHIKUMAR V"))
-            meta_mentor = st.text_input("Mentor", value=os.getenv("MENTOR", "N/A"))
+            meta_applicant = st.text_input("Applicant", value=get_config("APPLICANT", "SURYA PRAKASH R"))
+            meta_rep_manager = st.text_input("Reporting Manager", value=get_config("REPORTING_MANAGER", "SHASHIKUMAR V"))
+            meta_mentor = st.text_input("Mentor", value=get_config("MENTOR", "N/A"))
         with m_col2:
-            meta_module = st.text_input("Module", value=os.getenv("MODULE", "N/A"))
-            meta_proj_manager = st.text_input("Project Manager", value=os.getenv("PROJECT_MANAGER", "N/A"))
-            meta_proj_name = st.text_input("Project Name", value=os.getenv("PROJECT_NAME", "N/A"))
+            meta_module = st.text_input("Module", value=get_config("MODULE", "N/A"))
+            meta_proj_manager = st.text_input("Project Manager", value=get_config("PROJECT_MANAGER", "N/A"))
+            meta_proj_name = st.text_input("Project Name", value=get_config("PROJECT_NAME", "N/A"))
 
     # Generate formatted email content
     email_subject = f"Daily Report - {report_date.strftime('%d %B %Y')}"
@@ -931,8 +968,10 @@ else:
             st.markdown(f"**Cc:** `{cfg_cc}`")
         st.markdown("---")
         preview_card = f"""
-        <div class="email-preview-card" style="background-color: #ffffff !important; color: #000000 !important; padding: 25px 30px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); margin-top: 10px;">
-            {email_html}
+        <div class="email-preview-card" style="background-color: #ffffff !important; color: #000000 !important; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); margin-top: 10px;">
+            <div class="email-table-scroll-wrapper">
+                {email_html}
+            </div>
         </div>
         """
         st.html(preview_card)

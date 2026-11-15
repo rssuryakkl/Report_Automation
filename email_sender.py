@@ -129,7 +129,7 @@ def generate_email_html(
 
   <div style="margin-top: 30px; font-family: Georgia, 'Times New Roman', serif; font-size: 13.5px; line-height: 1.5;">
     <p class="rss-wine" style="margin: 0 0 6px 0; color: #741b47; font-weight: bold; font-family: Georgia, 'Times New Roman', serif;">With Regards,</p>
-    <div style="padding-left: 65px; font-family: Georgia, 'Times New Roman', serif;">
+    <div class="rss-indent" style="padding-left: 65px; font-family: Georgia, 'Times New Roman', serif;">
       <p class="rss-wine" style="margin: 0 0 3px 0; color: #741b47; font-weight: bold;">Surya Prakash R</p>
       <p class="rss-indigo" style="margin: 0 0 3px 0; color: #351c75; font-weight: bold;">B.Tech &ndash; Artificial Intelligence and Machine Learning,</p>
       <p class="rss-indigo" style="margin: 0 0 3px 0; color: #351c75; font-weight: bold;">Vadalur, Cuddalore District</p>
