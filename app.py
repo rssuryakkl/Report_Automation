@@ -30,218 +30,368 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Universal High-Contrast CSS for BOTH Dark Mode & Light Mode
-st.markdown("""
+# Universal & Dynamic Theme CSS for BOTH Dark Mode & Light Mode
+if "theme_radio" in st.session_state:
+    st.session_state["theme_mode"] = "Dark" if "Dark" in st.session_state["theme_radio"] else "Light"
+elif "theme_mode" not in st.session_state:
+    st.session_state["theme_mode"] = os.getenv("APP_THEME", "Dark")
+
+current_theme = st.session_state.get("theme_mode", "Dark")
+
+def get_theme_css(theme: str) -> str:
+    if theme == "Light":
+        return """
+        <style>
+        /* ========================================================
+           ☀️ LIGHT THEME STYLES
+           ======================================================== */
+        :root {
+            --text-color: #0f172a;
+            --background-color: #f8fafc;
+            --secondary-background-color: #ffffff;
+        }
+
+        /* App Background & Base Container */
+        .stApp, 
+        [data-testid="stAppViewContainer"], 
+        [data-testid="stHeader"] {
+            background-color: #f8fafc !important;
+            color: #0f172a !important;
+        }
+
+        /* Sidebar */
+        [data-testid="stSidebar"],
+        [data-testid="stSidebar"] > div:first-child {
+            background-color: #ffffff !important;
+            border-right: 1px solid #e2e8f0 !important;
+        }
+        [data-testid="stSidebar"] * {
+            color: #1e293b !important;
+        }
+
+        /* Headings & Widget Labels */
+        h1, h2, h3, h4, h5, h6,
+        [data-testid="stWidgetLabel"] label, 
+        [data-testid="stWidgetLabel"] p, 
+        label[data-testid="stWidgetLabel"],
+        .stWidgetLabel p,
+        .stWidgetLabel {
+            color: #0f172a !important;
+            font-weight: 600 !important;
+        }
+
+        /* Paragraphs & Markdown */
+        .stMarkdown p, .stMarkdown div, .stMarkdown span {
+            color: #1e293b;
+        }
+
+        /* Text Inputs, Textareas, Date/Time Inputs */
+        [data-testid="stTextInput"] input, 
+        [data-testid="stTextArea"] textarea, 
+        [data-testid="stDateInput"] input, 
+        [data-testid="stTimeInput"] input,
+        [data-testid="stNumberInput"] input,
+        [data-testid="stSelectbox"] div[data-baseweb="select"] {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            -webkit-text-fill-color: #0f172a !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+
+        /* Disabled Input (e.g. Day: Saturday) */
+        .stTextInput input:disabled, 
+        input:disabled, 
+        [data-testid="stTextInput"] input[disabled] {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            -webkit-text-fill-color: #0f172a !important;
+            opacity: 0.95 !important;
+            font-weight: 600 !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+
+        /* Captions & Code Pills */
+        [data-testid="stCaptionContainer"] p,
+        [data-testid="stCaptionContainer"] {
+            color: #475569 !important;
+            font-size: 0.85rem !important;
+        }
+
+        [data-testid="stCaptionContainer"] code,
+        .stMarkdown code,
+        code {
+            color: #15803d !important;
+            background-color: #f1f5f9 !important;
+            border: 1px solid #cbd5e1 !important;
+            font-weight: 700 !important;
+            padding: 2px 7px !important;
+            border-radius: 4px !important;
+        }
+
+        /* Checkboxes & Radios */
+        [data-testid="stCheckbox"] label, 
+        [data-testid="stCheckbox"] label span, 
+        [data-testid="stCheckbox"] p,
+        [data-testid="stRadio"] label,
+        [data-testid="stRadio"] label p,
+        [data-testid="stRadio"] div[role="radiogroup"] label {
+            color: #0f172a !important;
+            font-weight: 600 !important;
+        }
+
+        /* Secondary Buttons */
+        [data-testid="stButton"] button {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+        [data-testid="stButton"] button:hover {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            border-color: #94a3b8 !important;
+        }
+
+        /* Expanders */
+        [data-testid="stExpander"] {
+            background-color: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+        }
+        [data-testid="stExpander"] details summary span,
+        [data-testid="stExpander"] details summary svg {
+            color: #0f172a !important;
+            fill: #0f172a !important;
+            font-weight: 600 !important;
+        }
+
+        /* Dividers */
+        hr, [data-testid="stDivider"] {
+            border-color: #e2e8f0 !important;
+        }
+        </style>
+        """
+    else:
+        return """
+        <style>
+        /* ========================================================
+           🌙 DARK THEME STYLES
+           ======================================================== */
+        :root {
+            --text-color: #f8fafc;
+            --background-color: #0e1117;
+            --secondary-background-color: #1e293b;
+        }
+
+        /* App Background & Base Container */
+        .stApp, 
+        [data-testid="stAppViewContainer"], 
+        [data-testid="stHeader"] {
+            background-color: #0e1117 !important;
+            color: #f8fafc !important;
+        }
+
+        /* Sidebar */
+        [data-testid="stSidebar"],
+        [data-testid="stSidebar"] > div:first-child {
+            background-color: #161b22 !important;
+            border-right: 1px solid #30363d !important;
+        }
+        [data-testid="stSidebar"] * {
+            color: #e6edf3 !important;
+        }
+
+        /* Headings & Widget Labels */
+        h1, h2, h3, h4, h5, h6,
+        [data-testid="stWidgetLabel"] label, 
+        [data-testid="stWidgetLabel"] p, 
+        label[data-testid="stWidgetLabel"],
+        .stWidgetLabel p,
+        .stWidgetLabel {
+            color: #f8fafc !important;
+            font-weight: 600 !important;
+        }
+
+        /* Paragraphs & Markdown */
+        .stMarkdown p, .stMarkdown div, .stMarkdown span {
+            color: #e2e8f0;
+        }
+
+        /* Text Inputs, Textareas, Date/Time Inputs */
+        [data-testid="stTextInput"] input, 
+        [data-testid="stTextArea"] textarea, 
+        [data-testid="stDateInput"] input, 
+        [data-testid="stTimeInput"] input,
+        [data-testid="stNumberInput"] input,
+        [data-testid="stSelectbox"] div[data-baseweb="select"] {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+            -webkit-text-fill-color: #f8fafc !important;
+            border: 1px solid #334155 !important;
+        }
+
+        /* Disabled Input (e.g. Day: Saturday) */
+        .stTextInput input:disabled, 
+        input:disabled, 
+        [data-testid="stTextInput"] input[disabled] {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+            -webkit-text-fill-color: #f8fafc !important;
+            opacity: 0.95 !important;
+            font-weight: 600 !important;
+            border: 1px solid #475569 !important;
+        }
+
+        /* Captions & Code Pills */
+        [data-testid="stCaptionContainer"] p,
+        [data-testid="stCaptionContainer"] {
+            color: #94a3b8 !important;
+            font-size: 0.85rem !important;
+        }
+
+        [data-testid="stCaptionContainer"] code,
+        .stMarkdown code,
+        code {
+            color: #4ade80 !important;
+            background-color: #1e293b !important;
+            border: 1px solid #334155 !important;
+            font-weight: 700 !important;
+            padding: 2px 7px !important;
+            border-radius: 4px !important;
+        }
+
+        /* Checkboxes & Radios */
+        [data-testid="stCheckbox"] label, 
+        [data-testid="stCheckbox"] label span, 
+        [data-testid="stCheckbox"] p,
+        [data-testid="stRadio"] label,
+        [data-testid="stRadio"] label p,
+        [data-testid="stRadio"] div[role="radiogroup"] label {
+            color: #f8fafc !important;
+            font-weight: 600 !important;
+        }
+
+        /* Secondary Buttons */
+        [data-testid="stButton"] button {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+            border: 1px solid #334155 !important;
+        }
+        [data-testid="stButton"] button:hover {
+            background-color: #334155 !important;
+            color: #ffffff !important;
+            border-color: #475569 !important;
+        }
+
+        /* Expanders */
+        [data-testid="stExpander"] {
+            background-color: #161b22 !important;
+            border: 1px solid #30363d !important;
+            border-radius: 8px !important;
+        }
+        [data-testid="stExpander"] details summary span,
+        [data-testid="stExpander"] details summary svg {
+            color: #f8fafc !important;
+            fill: #f8fafc !important;
+            font-weight: 600 !important;
+        }
+
+        /* Dividers */
+        hr, [data-testid="stDivider"] {
+            border-color: #30363d !important;
+        }
+        </style>
+        """
+
+UNIVERSAL_CSS = """
 <style>
-/* 1. Widget Labels (Report Date, Day, In Time, Out Time, Service, Task) */
-[data-testid="stWidgetLabel"] label, 
-[data-testid="stWidgetLabel"] p, 
-label[data-testid="stWidgetLabel"],
-.stWidgetLabel p,
-.stWidgetLabel {
-    color: var(--text-color) !important;
-    font-weight: 600 !important;
-    font-size: 0.95rem !important;
-    opacity: 1 !important;
+/* Hide Streamlit Deploy button from header */
+[data-testid="stDeployButton"], 
+.stDeployButton {
+    display: none !important;
 }
 
-/* 2. Subtitle & General Markdown Text */
-.stMarkdown p, .stMarkdown div {
-    color: var(--text-color);
-}
-
-/* 3. Captions (e.g. "Recorded in Excel as:") */
-[data-testid="stCaptionContainer"] p,
-[data-testid="stCaptionContainer"] {
-    color: var(--text-color) !important;
-    opacity: 0.8 !important;
-    font-size: 0.85rem !important;
-}
-
-[data-testid="stCaptionContainer"] code {
+/* Primary Action Button Styling */
+[data-testid="stBaseButton-primary"], button[kind="primary"] {
+    background-color: #ff4b4b !important;
+    color: #ffffff !important;
+    border: none !important;
     font-weight: 700 !important;
-    padding: 2px 7px !important;
-    border-radius: 4px !important;
+}
+[data-testid="stBaseButton-primary"]:hover, button[kind="primary"]:hover {
+    background-color: #e03e3e !important;
+    color: #ffffff !important;
 }
 
-/* 4. Disabled Input (e.g. Day: Friday) - Crisp in BOTH Light & Dark */
-.stTextInput input:disabled, 
-input:disabled, 
-[data-testid="stTextInput"] input[disabled] {
-    color: var(--text-color) !important;
-    -webkit-text-fill-color: var(--text-color) !important;
-    background-color: var(--secondary-background-color) !important;
-    opacity: 0.95 !important;
-    font-weight: 600 !important;
-    border: 1px solid rgba(128, 128, 128, 0.4) !important;
-}
-
-/* 5. Checkbox Labels (e.g. "Mark as ABSENT", "Send immediately") */
-[data-testid="stCheckbox"] label, 
-[data-testid="stCheckbox"] label span, 
-[data-testid="stCheckbox"] p {
-    color: var(--text-color) !important;
-    font-weight: 600 !important;
-}
-
-/* 6. Active Inputs (Date, Time, Text, Textarea) - Dynamic Theme Adaptation */
-[data-testid="stTextInput"] input, 
-[data-testid="stTextArea"] textarea, 
-[data-testid="stDateInput"] input, 
-[data-testid="stTimeInput"] input {
-    color: var(--text-color) !important;
-    background-color: var(--secondary-background-color) !important;
-    border: 1px solid rgba(128, 128, 128, 0.3) !important;
-}
-
-/* 7. Section Expander Headers */
-[data-testid="stExpander"] details summary span {
-    color: var(--text-color) !important;
-    font-weight: 600 !important;
-}
-
-/* 8. Light / Dark adaptive code pills & alerts */
-@media (prefers-color-scheme: dark) {
-    [data-testid="stCaptionContainer"] code {
-        color: #4ade80 !important;
-        background-color: #1e293b !important;
-        border: 1px solid #334155 !important;
-    }
-}
-
-@media (prefers-color-scheme: light) {
-    [data-testid="stCaptionContainer"] code {
-        color: #15803d !important;
-        background-color: #f1f5f9 !important;
-        border: 1px solid #cbd5e1 !important;
-    }
-}
-
-[data-theme="dark"] [data-testid="stCaptionContainer"] code {
-    color: #4ade80 !important;
-    background-color: #1e293b !important;
-    border: 1px solid #334155 !important;
-}
-
-[data-theme="light"] [data-testid="stCaptionContainer"] code {
-    color: #15803d !important;
-    background-color: #f1f5f9 !important;
-    border: 1px solid #cbd5e1 !important;
-}
-
-/* Hide Streamlit Deploy button from header */
-[data-testid="stDeployButton"], 
-.stDeployButton {
-    display: none !important;
-}
-
-/* 9. Live Email Preview Card (Always pure white document with crisp black table) */
+/* ========================================================
+   ✉️ LIVE EMAIL PREVIEW CARD
+   Authentic pure white letterhead document with 100% crisp black table 
+   and vibrant Wine & Indigo RSS signature in BOTH themes.
+   ======================================================== */
 .email-preview-card,
 div[data-testid="stExpander"] div.stHtml,
 div[data-testid="stExpander"] div[data-testid="stHtml"] {
     background-color: #ffffff !important;
     color: #000000 !important;
     border-radius: 8px !important;
-    padding: 20px 24px !important;
-}
-
-.email-preview-card p,
-div[data-testid="stExpander"] div.stHtml p {
-    color: #000000 !important;
-}
-
-.email-preview-card table,
-div[data-testid="stExpander"] div.stHtml table {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    border: 1px solid #000000 !important;
-}
-
-.email-preview-card td,
-div[data-testid="stExpander"] div.stHtml td {
-    color: #000000 !important;
-    border: 1px solid #000000 !important;
-}
-
-.email-preview-card .rss-wine,
-div[data-testid="stExpander"] div.stHtml .rss-wine {
-    color: #741b47 !important;
-    font-weight: bold !important;
-}
-
-.email-preview-card .rss-indigo,
-div[data-testid="stExpander"] div.stHtml .rss-indigo {
-    color: #351c75 !important;
-    font-weight: bold !important;
-}
-
-@media (prefers-color-scheme: light) {
-    [data-testid="stCaptionContainer"] code {
-        color: #15803d !important;
-        background-color: #f1f5f9 !important;
-        border: 1px solid #cbd5e1 !important;
-    }
-}
-
-[data-theme="dark"] [data-testid="stCaptionContainer"] code {
-    color: #4ade80 !important;
-    background-color: #1e293b !important;
-    border: 1px solid #334155 !important;
-}
-
-[data-theme="light"] [data-testid="stCaptionContainer"] code {
-    color: #15803d !important;
-    background-color: #f1f5f9 !important;
+    padding: 24px 28px !important;
     border: 1px solid #cbd5e1 !important;
-}
-
-/* Hide Streamlit Deploy button from header */
-[data-testid="stDeployButton"], 
-.stDeployButton {
-    display: none !important;
-}
-
-/* 9. Live Email Preview Card (Always pure white document with crisp black table) */
-.email-preview-card,
-div[data-testid="stExpander"] div.stHtml,
-div[data-testid="stExpander"] div[data-testid="stHtml"] {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    border-radius: 8px !important;
-    padding: 20px 24px !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
 }
 
 .email-preview-card p,
-div[data-testid="stExpander"] div.stHtml p {
+.email-preview-card div,
+.email-preview-card span,
+div[data-testid="stExpander"] div.stHtml p,
+div[data-testid="stExpander"] div[data-testid="stHtml"] p {
     color: #000000 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
 }
 
 .email-preview-card table,
-div[data-testid="stExpander"] div.stHtml table {
+div[data-testid="stExpander"] div.stHtml table,
+div[data-testid="stExpander"] div[data-testid="stHtml"] table {
     background-color: #ffffff !important;
     color: #000000 !important;
     border: 1px solid #000000 !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+    max-width: 680px !important;
 }
 
 .email-preview-card td,
-div[data-testid="stExpander"] div.stHtml td {
+div[data-testid="stExpander"] div.stHtml td,
+div[data-testid="stExpander"] div[data-testid="stHtml"] td {
     color: #000000 !important;
     border: 1px solid #000000 !important;
+    background-color: #ffffff !important;
+    padding: 10px 14px !important;
+}
+
+.email-preview-card td *,
+div[data-testid="stExpander"] div.stHtml td * {
+    color: #000000 !important;
 }
 
 .email-preview-card .rss-wine,
-div[data-testid="stExpander"] div.stHtml .rss-wine {
+div[data-testid="stExpander"] div.stHtml .rss-wine,
+.email-preview-card p.rss-wine {
     color: #741b47 !important;
     font-weight: bold !important;
+    font-family: Georgia, 'Times New Roman', serif !important;
 }
 
 .email-preview-card .rss-indigo,
-div[data-testid="stExpander"] div.stHtml .rss-indigo {
+div[data-testid="stExpander"] div.stHtml .rss-indigo,
+.email-preview-card p.rss-indigo {
     color: #351c75 !important;
     font-weight: bold !important;
+    font-family: Georgia, 'Times New Roman', serif !important;
 }
 </style>
-""", unsafe_allow_html=True)
+"""
+
+st.markdown(get_theme_css(current_theme), unsafe_allow_html=True)
+st.markdown(UNIVERSAL_CSS, unsafe_allow_html=True)
 
 EXCEL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "daily_report.xlsx")
 HEADERS = ["Date", "Days", "In Time", "Out Time", "Service", "Task📝 ", "Dulingo (day,XP,english Score"]
@@ -456,6 +606,7 @@ def background_timer_send(delay_seconds: float, email_kwargs: dict, report_date_
 # ==========================================
 with st.sidebar:
     st.header("⚙️ Email & Mentor Setup")
+    st.caption(f"🎨 Active Theme: **{current_theme} Mode**")
     
     cfg_sender_name = st.text_input(
         "Sender Display Name",
@@ -582,8 +733,25 @@ with st.sidebar:
 # ==========================================
 # --- MAIN APPLICATION UI ---
 # ==========================================
-st.title("📝 Daily Report Automation")
-st.markdown("Record your daily work report into `daily_report.xlsx` and schedule automatic email delivery to your mentor.")
+header_col1, header_col2 = st.columns([3.2, 1.4])
+with header_col1:
+    st.title("📝 Daily Report Automation")
+    st.markdown("Record your daily work report into `daily_report.xlsx` and schedule automatic email delivery to your mentor.")
+with header_col2:
+    st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+    theme_choice = st.radio(
+        "Theme",
+        options=["🌙 Dark", "☀️ Light"],
+        index=0 if current_theme == "Dark" else 1,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="theme_radio"
+    )
+    chosen_theme = "Dark" if "Dark" in theme_choice else "Light"
+    if chosen_theme != st.session_state.get("theme_mode"):
+        st.session_state["theme_mode"] = chosen_theme
+        update_env_variable("APP_THEME", chosen_theme)
+        st.rerun()
 
 col1, col2, col3 = st.columns([2, 1, 1.4])
 with col1:
