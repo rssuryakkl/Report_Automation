@@ -1,0 +1,10 @@
+2026-11-13 06:59:08,113 [INFO] ==========================================
+2026-11-13 06:59:08,113 [INFO] Starting Daily Report 7:00 PM Mail Dispatcher
+2026-11-13 06:59:08,114 [INFO] ==========================================
+2026-11-13 06:59:08,530 [WARNING] No entry found in daily_report.xlsx matching today's date (2026-11-13).
+2026-11-13 06:59:08,531 [WARNING] If you entered your report under a different date, use --latest to force dispatch.
+2026-11-14 15:09:09,034 [INFO] ==========================================
+2026-11-14 15:09:09,036 [INFO] Starting Daily Report 7:00 PM Mail Dispatcher
+2026-11-14 15:09:09,036 [INFO] ==========================================
+2026-11-14 15:09:09,335 [WARNING] No entry found in daily_report.xlsx matching today's date (2026-11-14).
+2026-11-14 15:09:09,335 [WARNING] If you entered your report under a different date, use --latest to force dispatch.

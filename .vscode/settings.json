@@ -1,0 +1,9 @@
+{
+  "python.defaultInterpreterPath": "C:\\Users\\Desktop\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+  "terminal.external.windowsExec": "C:\\Windows\\System32\\cmd.exe",
+  "terminal.integrated.windowsEnableConpty": false,
+  "terminal.integrated.defaultProfile.windows": "Command Prompt",
+  "terminal.integrated.env.windows": {
+    "PATH": "C:\\Users\\Desktop\\AppData\\Local\\Programs\\Python\\Python312;C:\\Users\\Desktop\\AppData\\Local\\Programs\\Python\\Python312\\Scripts;${env:PATH}"
+  }
+}
