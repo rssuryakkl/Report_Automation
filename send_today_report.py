@@ -17,15 +17,16 @@ SENT_RECORD_FILE = os.path.join(LOGS_DIR, "sent_dates.json")
 # Ensure logs dir exists
 os.makedirs(LOGS_DIR, exist_ok=True)
 
-# Configure logging to both file and console
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE, encoding="utf-8"),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+# Configure dedicated logger for DailyReportScheduler (avoids polluting with external asyncio/server logs)
+logger = logging.getLogger("DailyReportScheduler")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    _fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    _sh = logging.StreamHandler(sys.stdout)
+    _sh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    logger.addHandler(_fh)
+    logger.addHandler(_sh)
 
 # Load environment
 load_dotenv(ENV_FILE, override=True)
@@ -66,25 +67,25 @@ def mark_sent_today(target_date_str: str):
         with open(SENT_RECORD_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
     except Exception as e:
-        logging.warning(f"Could not update sent record file: {e}")
+        logger.warning(f"Could not update sent record file: {e}")
 
 def run_scheduled_job(force: bool = False, use_latest: bool = False):
-    logging.info("==========================================")
-    logging.info("Starting Daily Report 7:00 PM Mail Dispatcher")
-    logging.info("==========================================")
+    logger.info("==========================================")
+    logger.info("Starting Daily Report 7:00 PM Mail Dispatcher")
+    logger.info("==========================================")
 
     if not os.path.exists(EXCEL_FILE):
-        logging.error(f"Excel file not found at: {EXCEL_FILE}")
+        logger.error(f"Excel file not found at: {EXCEL_FILE}")
         return False
 
     try:
         df = pd.read_excel(EXCEL_FILE)
     except Exception as e:
-        logging.error(f"Failed to read {EXCEL_FILE}: {e}")
+        logger.error(f"Failed to read {EXCEL_FILE}: {e}")
         return False
 
     if df.empty:
-        logging.warning("daily_report.xlsx is empty. Nothing to send.")
+        logger.warning("daily_report.xlsx is empty. Nothing to send.")
         return False
 
     today_date = date.today()
@@ -98,7 +99,7 @@ def run_scheduled_job(force: bool = False, use_latest: bool = False):
             report_date = pd.to_datetime(target_row["Date"]).date()
         except Exception:
             report_date = today_date
-        logging.info(f"Using latest recorded row from Excel for date: {report_date}")
+        logger.info(f"Using latest recorded row from Excel for date: {report_date}")
     else:
         # Match today's date
         df["_date_parsed"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
@@ -106,19 +107,19 @@ def run_scheduled_job(force: bool = False, use_latest: bool = False):
         if not today_matches.empty:
             target_row = today_matches.iloc[-1]
             report_date = today_date
-            logging.info(f"Found recorded entry for today ({today_date})")
+            logger.info(f"Found recorded entry for today ({today_date})")
         else:
             # Check if last row was today
-            logging.warning(f"No entry found in daily_report.xlsx matching today's date ({today_date}).")
-            logging.warning("If you entered your report under a different date, use --latest to force dispatch.")
+            logger.warning(f"No entry found in daily_report.xlsx matching today's date ({today_date}).")
+            logger.warning("If you entered your report under a different date, use --latest to force dispatch.")
             return False
 
     date_str_key = report_date.strftime("%Y-%m-%d")
 
     # Check for duplicate prevention
     if not force and is_already_sent_today(date_str_key):
-        logging.info(f"Report for date {date_str_key} was already sent previously today. Skipping duplicate.")
-        logging.info("Use --force if you intentionally wish to resend.")
+        logger.info(f"Report for date {date_str_key} was already sent previously today. Skipping duplicate.")
+        logger.info("Use --force if you intentionally wish to resend.")
         return True
 
     # Check if marked absent ('A') - do not send email
@@ -126,7 +127,7 @@ def run_scheduled_job(force: bool = False, use_latest: bool = False):
     task_check = str(target_row.get("Task📝 ", target_row.get("Task", ""))).strip().upper()
     service_check = str(target_row.get("Service", "")).strip().upper()
     if in_time_check == "A" or (task_check == "A" and service_check == "A"):
-        logging.info(f"Entry for {date_str_key} is marked as ABSENT ('A'). Skipping email delivery per configuration.")
+        logger.info(f"Entry for {date_str_key} is marked as ABSENT ('A'). Skipping email delivery per configuration.")
         return True
 
     # Extract row details
@@ -165,7 +166,7 @@ def run_scheduled_job(force: bool = False, use_latest: bool = False):
     smtp_port = int(os.getenv("SMTP_PORT", 587))
 
     if not sender_password:
-        logging.error("SENDER_PASSWORD is empty in .env. Cannot send email.")
+        logger.error("SENDER_PASSWORD is empty in .env. Cannot send email.")
         return False
 
     email_subject = f"Daily Report - {report_date.strftime('%d %B %Y')}"
@@ -198,7 +199,7 @@ def run_scheduled_job(force: bool = False, use_latest: bool = False):
         duolingo_text=duolingo_val
     )
 
-    logging.info(f"Dispatching email to: {recipients} (Subject: {email_subject})")
+    logger.info(f"Dispatching email to: {recipients} (Subject: {email_subject})")
     ok, status_msg = send_report_email(
         subject=email_subject,
         html_content=html_content,
@@ -214,11 +215,11 @@ def run_scheduled_job(force: bool = False, use_latest: bool = False):
     )
 
     if ok:
-        logging.info("SUCCESS: Email sent successfully!")
+        logger.info("SUCCESS: Email sent successfully!")
         mark_sent_today(date_str_key)
         return True
     else:
-        logging.error(f"FAILURE: Email delivery failed: {status_msg}")
+        logger.error(f"FAILURE: Email delivery failed: {status_msg}")
         return False
 
 if __name__ == "__main__":
