@@ -3,7 +3,6 @@ import re
 import html
 import smtplib
 import ssl
-import numpy as np
 import threading
 import time as time_module
 from datetime import date, time, datetime, timedelta
