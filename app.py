@@ -430,7 +430,15 @@ div[data-testid="stExpander"] div.stHtml .rss-indigo,
 """
 st.markdown(UNIVERSAL_RESPONSIVE_CSS, unsafe_allow_html=True)
 
-EXCEL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "daily_report.xlsx")
+def get_excel_path() -> str:
+    base = os.path.dirname(os.path.abspath(__file__))
+    for fname in ["Daily_report.xlsx", "daily_report.xlsx"]:
+        candidate = os.path.join(base, fname)
+        if os.path.exists(candidate):
+            return candidate
+    return os.path.join(base, "daily_report.xlsx")
+
+EXCEL_FILE = get_excel_path()
 HEADERS = ["Date", "Days", "In Time", "Out Time", "Service", "Task📝 ", "Dulingo (day,XP,english Score"]
 DUOLINGO_USERNAME = "rssuryakkl"
 

@@ -9,7 +9,14 @@ from dotenv import load_dotenv
 # Base directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_FILE = os.path.join(BASE_DIR, ".env")
-EXCEL_FILE = os.path.join(BASE_DIR, "daily_report.xlsx")
+def get_excel_path() -> str:
+    for fname in ["Daily_report.xlsx", "daily_report.xlsx"]:
+        candidate = os.path.join(BASE_DIR, fname)
+        if os.path.exists(candidate):
+            return candidate
+    return os.path.join(BASE_DIR, "daily_report.xlsx")
+
+EXCEL_FILE = get_excel_path()
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 LOG_FILE = os.path.join(LOGS_DIR, "scheduler.log")
 SENT_RECORD_FILE = os.path.join(LOGS_DIR, "sent_dates.json")
