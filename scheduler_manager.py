@@ -10,6 +10,8 @@ BAT_PATH = os.path.join(BASE_DIR, "run_scheduled_task.bat")
 
 def get_task_info() -> tuple[bool, str]:
     """Checks if the Windows Task is registered and extracts its scheduled next run time or status."""
+    if sys.platform != "win32":
+        return False, ""
     for t_name in [TASK_NAME, OLD_TASK_NAME]:
         try:
             cmd = f'schtasks /query /tn "{t_name}" /fo LIST'
@@ -25,11 +27,15 @@ def get_task_info() -> tuple[bool, str]:
 
 def is_task_scheduled() -> bool:
     """Checks if either the new or old Windows Task is currently registered."""
+    if sys.platform != "win32":
+        return False
     ok, _ = get_task_info()
     return ok
 
 def register_task(time_str: str = "19:00") -> tuple[bool, str]:
     """Registers a daily task in Windows Task Scheduler at any custom time (HH:MM in 24-hr format)."""
+    if sys.platform != "win32":
+        return False, "Windows Task Scheduler is only available when running locally on Windows."
     # Remove old task if it existed under the old name
     try:
         subprocess.run(f'schtasks /delete /tn "{OLD_TASK_NAME}" /f', shell=True, capture_output=True)
@@ -53,6 +59,8 @@ def register_task(time_str: str = "19:00") -> tuple[bool, str]:
 
 def unregister_task() -> tuple[bool, str]:
     """Unregisters both new and old tasks from Windows Task Scheduler."""
+    if sys.platform != "win32":
+        return False, "Windows Task Scheduler is only available when running locally on Windows."
     deleted_any = False
     err_msgs = []
     for t_name in [TASK_NAME, OLD_TASK_NAME]:
