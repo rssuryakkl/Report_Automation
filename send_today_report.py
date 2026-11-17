@@ -81,6 +81,21 @@ def run_scheduled_job(force: bool = False, use_latest: bool = False):
     logger.info("Starting Daily Report 7:00 PM Mail Dispatcher")
     logger.info("==========================================")
 
+    # Check if we should pull latest Excel from GitHub cloud
+    gh_token = os.getenv("GITHUB_TOKEN", "")
+    gh_repo = os.getenv("GITHUB_REPO", "rssuryakkl/Report_Automation")
+    gh_branch = os.getenv("GITHUB_BRANCH", "main")
+    if gh_token.strip():
+        try:
+            from github_sync import pull_excel_from_github
+            pull_ok, pull_msg = pull_excel_from_github(EXCEL_FILE, gh_repo, gh_token, gh_branch)
+            if pull_ok:
+                logger.info(f"Pulled latest Excel from cloud: {pull_msg}")
+            else:
+                logger.warning(f"Cloud pull notice: {pull_msg}")
+        except Exception as e:
+            logger.warning(f"Could not pull latest Excel from GitHub: {e}")
+
     if not os.path.exists(EXCEL_FILE):
         logger.error(f"Excel file not found at: {EXCEL_FILE}")
         return False

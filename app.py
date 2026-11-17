@@ -18,6 +18,7 @@ from dotenv import load_dotenv, set_key
 from email_sender import generate_email_html, generate_email_plain, send_report_email, save_email_to_gmail_drafts
 from scheduler_manager import get_task_info, is_task_scheduled, register_task, unregister_task
 from send_today_report import mark_sent_today, is_already_sent_today
+from github_sync import push_excel_to_github, pull_excel_from_github, test_github_connection
 
 # Load environment variables
 ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -441,6 +442,41 @@ EXCEL_FILE = get_excel_path()
 HEADERS = ["Date", "Days", "In Time", "Out Time", "Service", "Task📝 ", "Dulingo (day,XP,english Score"]
 DUOLINGO_USERNAME = "rssuryakkl"
 
+# One-time sync of latest Excel from GitHub cloud on app session startup
+if "github_excel_initial_synced" not in st.session_state:
+    st.session_state["github_excel_initial_synced"] = True
+    _init_token = get_config("GITHUB_TOKEN", "")
+    _init_repo = get_config("GITHUB_REPO", "rssuryakkl/Report_Automation")
+    _init_branch = get_config("GITHUB_BRANCH", "main")
+    if _init_token.strip():
+        pull_excel_from_github(EXCEL_FILE, _init_repo, _init_token, _init_branch)
+
+def sync_excel_to_cloud_feedback(target_date, day_name_str, is_absent=False):
+    """Pushes the updated Excel file to GitHub Cloud repository if token is configured."""
+    gh_token = get_config("GITHUB_TOKEN", "")
+    gh_repo = get_config("GITHUB_REPO", "rssuryakkl/Report_Automation")
+    gh_branch = get_config("GITHUB_BRANCH", "main")
+    
+    label = "Absent ('A') entry" if is_absent else "Report"
+    date_str = target_date.strftime("%d-%m-%Y")
+    
+    if gh_token.strip():
+        with st.spinner("☁️ Syncing Excel file to GitHub Cloud repository..."):
+            sync_ok, sync_msg = push_excel_to_github(
+                file_path=EXCEL_FILE,
+                repo=gh_repo,
+                token=gh_token,
+                branch=gh_branch,
+                commit_message=f"chore: update {label} for {date_str} via Cloud App [skip ci]"
+            )
+            if sync_ok:
+                st.success(f"✅ {label} for **{date_str} ({day_name_str})** saved & ☁️ **permanently preserved in GitHub Cloud!**")
+            else:
+                st.warning(f"✅ Saved locally, but ⚠️ GitHub Cloud sync notice: {sync_msg}")
+    else:
+        st.success(f"✅ {label} for **{date_str} ({day_name_str})** saved into `daily_report.xlsx`!")
+        st.caption("💡 *Note: To permanently preserve reports in the cloud across sleeps, add `GITHUB_TOKEN` in Sidebar → ☁️ Cloud Excel Sync.*")
+
 def update_env_variable(key: str, value: str):
     """Safely updates a key-value pair in .env file and reloads environment."""
     set_key(ENV_FILE, key, value)
@@ -773,6 +809,56 @@ with st.sidebar:
                 else:
                     st.error(f"❌ Failed to send: {msg}")
 
+    st.divider()
+    st.markdown("### ☁️ Cloud Excel Sync (GitHub)")
+    st.caption("Auto-saves `Daily_report.xlsx` into your GitHub repository so entered reports are permanently preserved even when Streamlit Cloud sleeps.")
+
+    cfg_gh_repo = st.text_input(
+        "GitHub Repo (owner/repo)",
+        value=get_config("GITHUB_REPO", "rssuryakkl/Report_Automation"),
+        help="Target GitHub repository."
+    )
+    cfg_gh_token = st.text_input(
+        "GitHub Access Token (PAT)",
+        value=get_config("GITHUB_TOKEN", ""),
+        type="password",
+        help="GitHub Personal Access Token with 'Contents: Read & Write' permission."
+    )
+    cfg_gh_branch = st.text_input(
+        "Branch",
+        value=get_config("GITHUB_BRANCH", "main")
+    )
+
+    if cfg_gh_token.strip():
+        conn_ok, conn_msg = test_github_connection(cfg_gh_repo, cfg_gh_token)
+        if conn_ok:
+            st.success(f"🟢 **Cloud Sync Active:** {conn_msg}")
+        else:
+            st.error(f"🔴 **Token Error:** {conn_msg}")
+    else:
+        st.info("⚪ **Cloud Sync Inactive**\nEnter your GitHub Token above or in Streamlit Cloud Secrets.")
+
+    col_gh1, col_gh2 = st.columns(2)
+    with col_gh1:
+        if st.button("💾 Save Token", key="btn_save_gh", use_container_width=True):
+            update_env_variable("GITHUB_REPO", cfg_gh_repo.strip())
+            update_env_variable("GITHUB_TOKEN", cfg_gh_token.strip())
+            update_env_variable("GITHUB_BRANCH", cfg_gh_branch.strip())
+            st.success("Saved GitHub settings to `.env`!")
+            st.rerun()
+    with col_gh2:
+        if st.button("☁️ Pull Cloud", key="btn_pull_gh", use_container_width=True):
+            if cfg_gh_token.strip():
+                with st.spinner("Fetching latest Excel from GitHub Cloud..."):
+                    p_ok, p_msg = pull_excel_from_github(EXCEL_FILE, cfg_gh_repo, cfg_gh_token, cfg_gh_branch)
+                    if p_ok:
+                        st.success(p_msg)
+                        st.rerun()
+                    else:
+                        st.error(p_msg)
+            else:
+                st.error("Please enter GitHub Token first.")
+
 
 # ==========================================
 # --- MAIN APPLICATION UI ---
@@ -911,7 +997,7 @@ if is_absent:
         try:
             save_report_to_excel(entry)
             excel_saved = True
-            st.success(f"✅ Marked **ABSENT ('A')** for **{report_date.strftime('%d-%m-%Y')} ({day_name})** and saved into `daily_report.xlsx`!")
+            sync_excel_to_cloud_feedback(report_date, day_name, is_absent=True)
             st.caption("ℹ️ No email or draft was created.")
             st.balloons()
         except PermissionError:
@@ -1004,7 +1090,7 @@ else:
             try:
                 save_report_to_excel(entry)
                 excel_saved = True
-                st.success(f"✅ Report for **{report_date.strftime('%d-%m-%Y')} ({day_name})** saved into `daily_report.xlsx`!")
+                sync_excel_to_cloud_feedback(report_date, day_name, is_absent=False)
             except PermissionError:
                 st.error("⚠️ **Cannot save to Excel:** `daily_report.xlsx` is currently open in Microsoft Excel. Please **close the file in Excel** and try again.")
             except Exception as e:
@@ -1079,14 +1165,34 @@ if os.path.exists(EXCEL_FILE):
 
             df_display = df.fillna("-").astype(str)
             st.dataframe(df_display, use_container_width=True, hide_index=True)
-            with open(EXCEL_FILE, "rb") as f:
-                st.download_button(
-                    label="📥 Download daily_report.xlsx",
-                    data=f.read(),
-                    file_name="daily_report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
+            col_d1, col_d2 = st.columns([1, 1])
+            with col_d1:
+                with open(EXCEL_FILE, "rb") as f:
+                    st.download_button(
+                        label="📥 Download daily_report.xlsx",
+                        data=f.read(),
+                        file_name="daily_report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+            with col_d2:
+                gh_token_chk = get_config("GITHUB_TOKEN", "")
+                if gh_token_chk.strip():
+                    if st.button("☁️ Push Local Excel to GitHub Cloud", use_container_width=True):
+                        with st.spinner("Uploading to GitHub Cloud..."):
+                            p_ok, p_msg = push_excel_to_github(
+                                file_path=EXCEL_FILE,
+                                repo=get_config("GITHUB_REPO", "rssuryakkl/Report_Automation"),
+                                token=gh_token_chk,
+                                branch=get_config("GITHUB_BRANCH", "main"),
+                                commit_message="chore: manual Excel push from Web App [skip ci]"
+                            )
+                            if p_ok:
+                                st.success(p_msg)
+                            else:
+                                st.error(p_msg)
+                else:
+                    st.caption("☁️ *Add GITHUB_TOKEN in sidebar to enable 1-click cloud push.*")
         else:
             st.info("No reports logged yet. Submit the form above to add an entry!")
     except PermissionError:
